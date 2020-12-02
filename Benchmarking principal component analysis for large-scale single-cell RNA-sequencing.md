@@ -8,9 +8,14 @@ Benchmarking principal component analysis for large-scale single-cell RNA-sequen
 
 # Result
 
-Krylov subspace和randomized singular value decomposition在速度，内存和精确度上优于其他算法。
-seurat能分析的规模(10^4^ genes × 10^5^ cells)
-scanpy能分析的规模(10^4^ genes × 10^6^ cells)
+1. Krylov subspace和randomized singular value decomposition在速度，内存和精确度上优于其他算法。
+2. 对seurat使用者的建议: seurat能分析的规模(10^4^ genes × 10^5^ cells), PCA降维的算法选择性较少, 就prcomp(full-rand SVD), IRLBA(TruncatedSVD, Krylov)
+3. 对于scanpy使用者的建议: scanpy能分析的规模(10^4^ genes × 10^6^ cells), 根据一些目的区分, PCA时选择的参数:
+
+	- 数据规模超级大, 可以忍受一些稀有细胞类型丢失或者亚群丢失, 选择chunked方式, 渐进式(IncrementalPCA)的out-of-core计算PCA, chunk_size设置为大一些, 最少100(>num of PCs)
+	- 数据规模很大(稀疏矩阵), 又不太想一些稀有细胞类型丢失或者亚群丢失, 选择arpack/lobpcg(操作稀疏矩阵), zero_center=True
+	- 数据规模很大(稀疏矩阵), 常规分析, zero_center=False, PCA降维(TruncatedSVD)得到的PCs可能会受到某些基因表达量的影响.
+	- 数据规模不是很大(稠密矩阵), 选择randomized, zero_center=True
 
 ![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606819796972.png)
 
