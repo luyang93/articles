@@ -111,7 +111,7 @@ t-SNE: Downsampling会忽略一些subgroups
 
 基因上的特征向量(loading vectors)容易受矩阵和细胞上的特征向量(PCs)影响
 取top 500 genes, 比较两个loading vectors之间共同的基因.
-file:///opt/zotero/storage/7BXK7MU5/13059_2019_1900_MOESM14_ESM.png![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606802589332.png)
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606802589332.png)
 结论:
 - downsampling, GD, dask的精确度较差
 
