@@ -9,6 +9,14 @@ Benchmarking principal component analysis for large-scale single-cell RNA-sequen
 # Result
 
 Krylov subspace和randomized singular value decomposition在速度，内存和精确度上优于其他算法。
+seurat能分析的规模(10^4^ genes × 10^5^ cells)
+scanpy能分析的规模(10^4^ genes × 10^6^ cells)
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606819796972.png)
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606820984456.png)
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606814124058.png)
 
 # 必要性
 
@@ -24,7 +32,7 @@ Krylov subspace和randomized singular value decomposition在速度，内存和�
 
 prcomp(R), PCA(python sklearn) Golub-Kahan method, full-rank SVD based on LAPACK(DGESVD, DGESVD)
 
-- 大规模数据，out of memory
+- 大规模数据，out of memory, 蓝色的部分需要稠密矩阵
 
 ![image-20201201062331557](https://raw.githubusercontent.com/bedforimg/imgbed/master/img/2020/12/01/image-20201201062331557.png)
 
@@ -75,15 +83,13 @@ t-SNE: Downsampling会忽略一些subgroups
 
 ![image-20201201105602264](https://raw.githubusercontent.com/bedforimg/imgbed/master/img/2020/12/01/image-20201201105602264.png)
 
-## 对于BrainSpinalCord和Brain数据集, 使用特征值的大小和分群准确性比较。
-
 ### ARI(adjusted Rand index)值：
 
 ![image-20201201114909134](https://raw.githubusercontent.com/bedforimg/imgbed/master/img/2020/12/01/image-20201201114909134.png)
 
 ![image-20201201113732942](https://raw.githubusercontent.com/bedforimg/imgbed/master/img/2020/12/01/image-20201201113732942.png)
 
-结论: Louvain cluster中sgd(OnlinePCA.jl)和downsampling的ARI值都不是很好
+结论: Louvain cluster中sgd(OnlinePCA.jl)和downsampling的ARI值较差
 
 ### PCs之间的关联性
 
@@ -91,10 +97,91 @@ t-SNE: Downsampling会忽略一些subgroups
 
 ![image-20201201130348713](https://raw.githubusercontent.com/bedforimg/imgbed/master/img/2020/12/01/image-20201201130348713.png)
 
-downsampling和GD的结果不是很好。
+结论: 
+- downsampling和GD的结果不是很好.
+- k-means/GMM的聚类方式容易导致一些异常cell聚类成单例簇
+- Krylov(IRLBA IRAM)和SVD的结果与标准相似, dask的方法为特例, Direct Tall-and-Skinny QR algorithm
 
+### 比较loading vectors
+
+基因上的特征向量(loading vectors)容易受矩阵和细胞上的特征向量(PCs)影响
+取top 500 genes, 比较两个loading vectors之间共同的基因.
+file:///opt/zotero/storage/7BXK7MU5/13059_2019_1900_MOESM14_ESM.png![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606802589332.png)
+结论:
+- downsampling, GD, dask的精确度较差
+
+### 比较每个PC的贡献
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606803204541.png)
+
+结论:
+- downsample, IncrementalPCA (sklearn), sgd的结果与其他的不同
+
+
+## 对于BrainSpinalCord和Brain数据集, 使用特征值的大小和分群准确性比较。
+无法使用full-rank SVD
+
+### 不同算法PCs之间的关联性
+
+![大数据集](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606801302606.png)
+
+结论: 
+- downsampling和GD的结果与其他PCA实现方式差异较大
 
 
 
 # Time, Memory, scalability(人造数据)
 
+downsampling: BrainSpinalCord的PCA较快, 但是前处理花时间. Brain的PCA就很慢了(full-rank SVD)
+
+out-of-core methods: dask-ml超时, IncrementalPCA (sklearn), orthiter/gd/sgd/halko/algorithm971 (OnlinePCA.jl), and oocPCA_CSV (oocRPCA)在在3天之内完成.
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606803814875.png)
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606806999425.png)
+
+![时间](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606807372479.png)
+
+![空间](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606807405918.png)
+
+## 数据格式与性能关系
+主要测ooc实现方案(out-of-core)
+- oocPCA_CSV(R, oocRPCA)
+- IncrementalPCA(Python, sklearn)
+- orthiter/gd/sgd/halko/algorithm971 (Julia,OnlinePCA.jl)
+ 
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606815192122.png)
+结论: 
+- csv读取的时间较长, 处理过的二进制文件加载起来较快.
+- 稀疏矩阵读起来比较快, 内存占用也比更低(???)
+- 稀疏矩阵对计算的加速
+- OnlinePCA.jl实现了一些ooc的方案, 并可以把PCA计算的结果导出.
+
+# Guideline for User
+GC = num of genes × num of cells
+
+- GC<10^7^, full-ranked SVD
+- 10^7^<GC<10^8^, Krylov(IRLBA, IRAM), Rand(Li, Halko methods)
+- 10^8^<GC<10^10^, 稀疏矩阵读取入内存
+- GC>10^10^, out-of-core
+
+![enter description here](https://raw.githubusercontent.com/bedforimg/imgbed/master/images/2020/12/1/1606818813267.png)
+
+IncrementalPCA (sklearn): 对chunksize调优, 较大的chunksize会增加PCA结果的准确性, 但是会增加时间和空间
+Rand(LI, halko): 对迭代次数调优, 至少3次, sklearn默认5
+
+# Guideline for Dev
+注意点: 
+- 某些操作会让稀疏矩阵"失去"稀疏性, 比如中心化, X-Xmean. 解决方案 (X − Xmean) W = XW − XmeanW, 渐进式计算
+- lazy loading, out-of-core的方式进行centering, scaling, 
+
+
+其他: 
+- 1.out-of-core方案, HDF5/loom 2.稀疏矩阵方案
+- PCA算法 EVD(稠密矩阵, 稀疏矩阵) truncated SVD
+- 集群方案, MPI OpenMP等等
+
+# 拓展
+
+CCA的数学原理也和PCA类似, 优化 randomized CCA or SGD of CCA
+downsampling比率的问题
